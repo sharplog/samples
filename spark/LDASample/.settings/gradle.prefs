@@ -1,0 +1,12 @@
+{
+  "1.0": {
+    "project_path": ":",
+    "project_dir": "D:\\workspace\\samples\\spark\\LDASample",
+    "connection_project_dir": "D:\\workspace\\samples\\spark\\LDASample",
+    "connection_gradle_user_home": null,
+    "connection_gradle_distribution": "GRADLE_DISTRIBUTION(WRAPPER)",
+    "connection_java_home": "D:\\jdk1.7.0_67",
+    "connection_jvm_arguments": "",
+    "connection_arguments": ""
+  }
+}
