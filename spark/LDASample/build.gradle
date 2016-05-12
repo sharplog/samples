@@ -25,6 +25,7 @@ repositories {
 dependencies {
     compile 'org.apache.spark:spark-core_2.10:1.6.0'
     compile 'org.apache.spark:spark-mllib_2.10:1.6.0'
+    compile 'com.hankcs:hanlp:portable-1.2.9'
 
     // The production code uses the SLF4J logging API at compile time
     compile 'org.slf4j:slf4j-api:1.7.14'
@@ -34,6 +35,10 @@ dependencies {
     // testCompile dependency to testCompile 'org.testng:testng:6.8.1' and add
     // 'test.useTestNG()' to your build script.
     testCompile 'junit:junit:4.12'
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
 }
 
 task runSpark(type: JavaExec, dependsOn: 'classes') {
@@ -48,5 +53,15 @@ task runW2V(type: JavaExec, dependsOn: 'classes') {
 
 task runCV(type: JavaExec, dependsOn: 'classes') {
     main = "com.github.sharplog.samples.spark.ldasample.CountVectorizerExample"
+    classpath = sourceSets.main.runtimeClasspath
+}
+
+task runFC(type: JavaExec, dependsOn: 'classes') {
+    main = "com.github.sharplog.samples.spark.ldasample.HanLPExample"
+    classpath = sourceSets.main.runtimeClasspath
+}
+
+task runWB(type: JavaExec, dependsOn: 'classes') {
+    main = "com.github.sharplog.samples.spark.ldasample.WeiboAnalyzer"
     classpath = sourceSets.main.runtimeClasspath
 }
