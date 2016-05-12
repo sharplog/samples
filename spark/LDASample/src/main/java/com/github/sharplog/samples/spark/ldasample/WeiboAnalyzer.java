@@ -10,7 +10,6 @@ import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.Function;
-import org.apache.spark.api.java.function.PairFunction;
 import org.apache.spark.ml.feature.CountVectorizer;
 import org.apache.spark.ml.feature.CountVectorizerModel;
 import org.apache.spark.ml.feature.StopWordsRemover;
@@ -52,48 +51,43 @@ public class WeiboAnalyzer {
 		JavaRDD<String> stopSet = jsc.textFile(stopFile);
 		
 		// 解析微博内容
-		JavaPairRDD<String, String> weibo = dataSet.mapToPair(new PairFunction<String, String, String>(){
+		JavaRDD<String> weibo = dataSet.map(new Function<String, String>(){
 			@Override
-			public Tuple2<String, String> call(String line) throws Exception {
+			public String call(String line) throws Exception {
 				Matcher m = weiboReg.matcher(line);
 				if( m.find() ){
-					return new Tuple2<>(m.group(1), m.group(5));	// 微博ID、内容
+					return m.group(5);	// 微博内容
 				}
 				return null;
 			}
 		});
 		
 		// 去除空内容
-		JavaPairRDD<String, String> weiboFlt = weibo.filter(new Function<Tuple2<String, String>, Boolean>(){
+		JavaRDD<String> weiboFlt = weibo.filter(new Function<String, Boolean>(){
 			@Override
-			public Boolean call(Tuple2<String, String> c) throws Exception {
-				return null != c && null != c._2() && !"".equals(c._2().trim());
+			public Boolean call( String c) throws Exception {
+				return null != c && !"".equals(c.trim());
 			}
 			
 		});
 		
 		// 分词
-		JavaRDD<Row> words = weiboFlt.map(new Function<Tuple2<String, String>, Row>(){
+		JavaRDD<Row> words = weiboFlt.map(new Function<String, Row>(){
 			@Override
-			public Row call(Tuple2<String, String> pair) throws Exception {
-				String id = pair._1();
-				String content = pair._2();
+			public Row call(String content) throws Exception {
+				List<String> wl = new ArrayList<String>();
 				if( content != null ){
 					List<Term> l = HanLP.segment(content);
-					List<String> wl = new ArrayList<String>();
 					for(int i=0; i<l.size(); i++){
 						wl.add(l.get(i).word);
 					}
-					return RowFactory.create(id, wl);
 				}
-				return null;
+				return RowFactory.create(wl);
 			}
 		});
 		
 		// 转成DataFrame
 		StructType schema = new StructType(new StructField[]{
-				new StructField(
-					"id", DataTypes.StringType, false, Metadata.empty()),
 				new StructField(
 				    "words", DataTypes.createArrayType(DataTypes.StringType), false, Metadata.empty())
 				});
@@ -119,13 +113,13 @@ public class WeiboAnalyzer {
 		
 		// 为每条微博生成向量
 		DataFrame counterVectors = cvModel.transform(wordFlt)
-				.select("id", "features");
+				.select("features");
 		
 		JavaPairRDD<Long, Vector> corpus = JavaPairRDD.fromJavaRDD(counterVectors.javaRDD().zipWithIndex().map(
 				new Function<Tuple2<Row, Long>, Tuple2<Long, Vector>>(){
 					@Override
 					public Tuple2<Long, Vector> call(Tuple2<Row, Long> r) throws Exception {
-						return new Tuple2<>(r._2(), (Vector)r._1().get(1));
+						return new Tuple2<>(r._2(), (Vector)r._1().get(0));
 					}
 				}
 		));
@@ -138,7 +132,7 @@ public class WeiboAnalyzer {
 				.setMaxIterations(maxIterations)
 				.run(corpus);
 		
-		// 打印每个主题的单词
+		// 打印每个主题的排名靠前的词汇
 		String vocabArray[] = cvModel.vocabulary();
 		Tuple2<int[], double[]>[] topicIndices = ldaModel.describeTopics(maxTermsPerTopic);
 		for(int i=0; i<topicIndices.length; i++){
