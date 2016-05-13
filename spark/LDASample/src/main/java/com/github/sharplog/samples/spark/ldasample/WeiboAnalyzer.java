@@ -26,6 +26,8 @@ import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 
 import com.hankcs.hanlp.HanLP;
+import com.hankcs.hanlp.seg.Segment;
+import com.hankcs.hanlp.seg.Dijkstra.DijkstraSegment;
 import com.hankcs.hanlp.seg.common.Term;
 
 import scala.Tuple2;
@@ -35,17 +37,20 @@ public class WeiboAnalyzer {
 	public static final String weiboFile = "data/weibo/tweets.csv";
 	public static final String stopFile = "data/weibo/stopwords.txt";
 	
-	public static int vocabSize = 100;				// 词汇表长度
-	public static int numTopics = 3;				// 主题数量 ，根业务相关
+	public static int vocabSize = 3000;				// 词汇表长度
+	public static int numTopics = 20;				// 主题数量 ，根业务相关
 	public static int maxIterations = 100;			// 最大迭代次数
-	public static int maxTermsPerTopic = 10;		// 每个主题的前10个词
+	public static int maxTermsPerTopic = 20;		// 每个主题的前N个词
+	public static int maxDocumentsPerTopic = 20;	// 每个主题的前N条微博
 	public static final Pattern weiboReg = Pattern.compile(
 			"^\"(.+)\",(\\d+),(\\d+),(\\d+),\"(.+)\",\"(.+)\",\"(.+)\",\"(.+)\",");
+	public static final Segment shortestSegment = new DijkstraSegment();
 	
 	public static void main(String[] args){
 		SparkConf sc = new SparkConf().setAppName("WeiboAnalyzer").setMaster("local[2]");
 		JavaSparkContext jsc = new JavaSparkContext(sc);
 		SQLContext jsql = new SQLContext(jsc);
+		jsc.setLogLevel("WARN");
 		
 		JavaRDD<String> dataSet = jsc.textFile(weiboFile);
 		JavaRDD<String> stopSet = jsc.textFile(stopFile);
@@ -56,7 +61,9 @@ public class WeiboAnalyzer {
 			public String call(String line) throws Exception {
 				Matcher m = weiboReg.matcher(line);
 				if( m.find() ){
-					return m.group(5);	// 微博内容
+					String s = m.group(5);				// 微博内容
+					s = s.replaceAll("\\[.{1,4}\\]", "");	// 去表情符
+					return s;
 				}
 				return null;
 			}
@@ -68,7 +75,6 @@ public class WeiboAnalyzer {
 			public Boolean call( String c) throws Exception {
 				return null != c && !"".equals(c.trim());
 			}
-			
 		});
 		
 		// 分词
@@ -79,7 +85,8 @@ public class WeiboAnalyzer {
 				if( content != null ){
 					List<Term> l = HanLP.segment(content);
 					for(int i=0; i<l.size(); i++){
-						wl.add(l.get(i).word);
+						String w = l.get(i).word.trim();
+						if( !"".equals(w) ) wl.add(w);
 					}
 				}
 				return RowFactory.create(wl);
@@ -103,7 +110,7 @@ public class WeiboAnalyzer {
 				.setOutputCol("filtered");
 		
 		DataFrame wordFlt = remover.transform(wordSet);
-
+wordFlt.select("filtered").show(200, false);
 		// 生成词汇表
 		CountVectorizerModel cvModel = new CountVectorizer()
 				.setInputCol("filtered")
@@ -142,6 +149,19 @@ public class WeiboAnalyzer {
 			double[] weights = topicIndices[i]._2();
 			for(int j=0; j<indices.length; j++){
 				System.out.println(vocabArray[indices[j]] + "\t" + weights[j]);
+			}
+			System.out.println("================\n");
+		}
+		
+		// 打印每个主题下的微博
+		Tuple2<long[],double[]>[] topDocs = ldaModel.topDocumentsPerTopic(maxDocumentsPerTopic);
+		for(int i=0; i<topDocs.length; i++){
+			System.out.println("Topic " + i + ": ");
+			
+			long[] docs = topDocs[i]._1();
+			double[] weights = topDocs[i]._2();
+			for(int j=0; j<docs.length; j++){
+				System.out.println(docs[j] + ": " + weights[j] + ", ");
 			}
 			System.out.println("================\n");
 		}
