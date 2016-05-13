@@ -18,7 +18,8 @@ public class BingPicGetter {
         
         try {
             String urlstr = "http://cn.bing.com";
-            Pattern p = Pattern.compile("url:'(http:.*1920x1080.jpg)',id:");
+            //Pattern p = Pattern.compile("url:'(http:.*1920x1080.jpg)',id:");
+            Pattern p = Pattern.compile("url: \"(http:.+?1920x1080.jpg)\",");
 
             URL url = new URL(urlstr);
             connection = (HttpURLConnection)url.openConnection();
@@ -31,11 +32,12 @@ public class BingPicGetter {
             while( null != (s = bf.readLine())){
                 sb.append(s);
             }
-            
+
             String furl = null;
             Matcher m = p.matcher(sb);
             if( m.find() ){
                 furl = m.group(1);
+                furl = furl.replaceAll("\\\\", "");
             }
 
             String fname = null;
