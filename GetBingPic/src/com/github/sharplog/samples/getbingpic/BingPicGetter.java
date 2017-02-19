@@ -13,14 +13,40 @@ import java.util.regex.Pattern;
 
 public class BingPicGetter {
     public static void main(String[] args){
-        HttpURLConnection connection = null;
-        String picPath = "E:/Pictures/";
+        final String key_path = "--path=";
+        final String key_parttern = "--parttern=";
+        final String key_help = "--help";
+        
+    	HttpURLConnection connection = null;
+        String picPath = "E:/Pictures/background/";
+        String partternStr = "url: \"(\\/.+?1920x1080.jpg)\",";
+        
+        for (int i = 0; i < args.length; i++) {
+        	if( args[i].equals(key_help) ){
+        		printUsage();
+        		continue;
+        	}
+        	else if(args[i].startsWith(key_path)){
+        		picPath = args[i].substring(key_path.length());
+        		continue;
+        	}
+        	else if(args[i].startsWith(key_parttern)){
+        		partternStr = args[i].substring(key_parttern.length());
+        		continue;
+        	}
+        	else{
+        		System.out.println("Don't known option: " + args[i]);
+        		System.out.println();
+        		printUsage();
+        		return;
+        	}
+        }
         
         try {
             String urlstr = "http://cn.bing.com";
             //Pattern p = Pattern.compile("url:'(http:.*1920x1080.jpg)',id:");
             //Pattern p = Pattern.compile("url: \"(http:.+?1920x1080.jpg)\",");
-            Pattern p = Pattern.compile("url: \"(\\/.+?1920x1080.jpg)\",");
+            Pattern p = Pattern.compile(partternStr);
 
             URL url = new URL(urlstr);
             connection = (HttpURLConnection)url.openConnection();
@@ -79,5 +105,16 @@ public class BingPicGetter {
             }
         }
     }
+
+	private static void printUsage() {
+		System.out.println("Usage: java -jar binggetter.jar [option]...");
+		System.out.println();
+		System.out.println("Get background picture from cn.bing.com.");
+		System.out.println();
+		System.out.println("Options:");
+		System.out.println("\t--help           print this message.");
+		System.out.println("\t--path=PATH      save picture to PATH.");
+		System.out.println("\t--parttern=EXPR  use regular expression EXPR to parse picture url.");
+	}
 
 }
